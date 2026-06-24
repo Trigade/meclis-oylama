@@ -3,6 +3,7 @@ package auth
 import (
 	"database/sql"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,7 +41,6 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	// Üyeyi veritabanında bul
 	var member Member
 	var passwordHash string
 	query := `SELECT id, name, role, password_hash FROM members WHERE tc_no = $1`
@@ -56,30 +56,23 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	// TODO: bcrypt ile şifre doğrulaması
-	// if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "geçersiz kimlik bilgileri"})
-	// 	return
-	// }
-
-	// Geliştirme aşaması: şifre kontrolü geçici olarak devre dışı
-	_ = passwordHash
-
-	// Salonda mı kontrol et
-	present, err := h.attendance.IsMemberPresent(h.meetingID, member.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "yoklama kontrol hatası"})
-		return
-	}
-	if !present {
-		c.JSON(http.StatusForbidden, gin.H{"error": "salonda değilsiniz"})
-		return
+	// Salonda mı kontrol et (Moderatör muaf)
+	if member.Role != "moderator" {
+		present, err := h.attendance.IsMemberPresent(h.meetingID, member.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "yoklama kontrol hatası"})
+			return
+		}
+		if !present {
+			c.JSON(http.StatusForbidden, gin.H{"error": "salonda değilsiniz"})
+			return
+		}
 	}
 
-	// HTTP-Only cookie bas
+	// HTTP-Only cookie bas (DÜZELTİLDİ)
 	c.SetCookie(
 		"session_member_id",
-		string(rune(member.ID)),
+		strconv.Itoa(member.ID),
 		3600*8, // 8 saat
 		"/",
 		"",

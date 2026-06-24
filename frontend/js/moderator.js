@@ -1,10 +1,12 @@
-const API = 'http://localhost:8080/api';
 let activeVotingId = null;
 
 // Üye sayısını çek ve güncelle
 async function refreshCount() {
   const res = await fetch(`${API}/attendance/count`, { credentials: 'include' });
-  if (!res.ok) return;
+  if (!res.ok) {
+      console.error("HATA:", res.status, await res.text());
+      return;
+  }
   const data = await res.json();
   const count = data.present_count;
 

@@ -7,9 +7,17 @@ CREATE TABLE IF NOT EXISTS members (
     created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO members (name, tc_no, password_hash, role) VALUES
-    ('Test Moderatör', '10000000000', '$2a$10$placeholder', 'moderator'),
-    ('Üye 1',          '10000000001', '$2a$10$placeholder', 'member'),
-    ('Üye 2',          '10000000002', '$2a$10$placeholder', 'member'),
-    ('Üye 3',          '10000000003', '$2a$10$placeholder', 'member')
+-- Moderatörü manuel ekleyelim
+INSERT INTO members (name, tc_no, password_hash, role) 
+VALUES ('Test Moderatör', '10000000000', '$2a$10$placeholder', 'moderator')
+ON CONFLICT DO NOTHING;
+
+-- 35 Tane normal üyeyi otomatik oluşturalım
+INSERT INTO members (name, tc_no, password_hash, role)
+SELECT 
+    'Üye ' || i, 
+    (10000000000 + i)::text, 
+    '$2a$10$placeholder', 
+    'member'
+FROM generate_series(1, 35) AS i
 ON CONFLICT DO NOTHING;
