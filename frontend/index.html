@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meclis Oylama — Giriş</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div class="page-center">
+    <div class="card">
+      <h1>Meclis Oylama Sistemi</h1>
+      <p class="subtitle">Lütfen TC kimlik numaranız ile giriş yapın.</p>
+
+      <div id="error-box" class="error-box hidden"></div>
+
+      <form id="login-form">
+        <div class="field">
+          <label for="tc_no">TC Kimlik No</label>
+          <input type="text" id="tc_no" maxlength="11" placeholder="11 haneli TC no" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="password">Şifre</label>
+          <input type="password" id="password" placeholder="Şifreniz">
+        </div>
+        <button type="submit" id="login-btn" class="btn-primary">Giriş Yap</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+</body>
+</html> 

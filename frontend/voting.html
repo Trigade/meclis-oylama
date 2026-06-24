@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oylama</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <span class="topbar-title">Meclis Oylama</span>
+      <button id="logout-btn" class="btn-ghost">Çıkış</button>
+    </header>
+
+    <main class="content">
+
+      <!-- Bekleme ekranı -->
+      <div id="waiting-screen" class="card center">
+        <div class="waiting-icon">⏳</div>
+        <h2>Oylama Bekleniyor</h2>
+        <p class="subtitle">Moderatör oylama başlattığında butonlar belirecek.</p>
+        <div class="pulse-dot"></div>
+      </div>
+
+      <!-- Oylama ekranı -->
+      <div id="voting-screen" class="hidden">
+        <div class="card center">
+          <p class="voting-label">Gündem Maddesi</p>
+          <h2 id="voting-title" class="voting-title"></h2>
+        </div>
+
+        <div id="vote-buttons" class="vote-grid">
+          <button id="evet-btn" class="vote-btn evet" onclick="castVote('evet')">
+            <span class="vote-btn-label">EVET</span>
+          </button>
+          <button id="hayir-btn" class="vote-btn hayir" onclick="castVote('hayir')">
+            <span class="vote-btn-label">HAYIR</span>
+          </button>
+        </div>
+
+        <div id="voted-msg" class="card center hidden">
+          <h2>Oyunuz Alındı</h2>
+          <p class="subtitle">Sonuç açıklanana kadar bekleyin.</p>
+        </div>
+      </div>
+
+      <!-- Sonuç ekranı -->
+      <div id="result-screen" class="hidden">
+        <div class="card center">
+          <h2>Oylama Sonucu</h2>
+          <div id="result-display" class="result"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/ws_client.js"></script>
+  <script src="js/voting.js"></script>
+</body>
+</html>

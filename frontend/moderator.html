@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moderatör Paneli</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <span class="topbar-title">Moderatör Paneli</span>
+      <button id="logout-btn" class="btn-ghost">Çıkış</button>
+    </header>
+
+    <main class="content">
+
+      <!-- Yoklama kartı -->
+      <div class="card">
+        <h2>Salon Durumu</h2>
+        <div class="stat-row">
+          <span class="stat-label">Salondaki üye</span>
+          <span id="present-count" class="stat-value">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Toplantı yeter sayısı</span>
+          <span class="stat-value">16</span>
+        </div>
+        <div id="quorum-badge" class="badge badge-waiting">Yeter sayı bekleniyor</div>
+      </div>
+
+      <!-- Oylama başlat kartı -->
+      <div class="card">
+        <h2>Oylama Başlat</h2>
+        <div class="field">
+          <label for="voting-title">Gündem maddesi</label>
+          <input type="text" id="voting-title" placeholder="Örn: 2026 bütçe teklifi">
+        </div>
+        <button id="start-btn" class="btn-primary" disabled>Oylama Başlat</button>
+        <p id="start-hint" class="hint">Oylama başlatmak için en az 16 üye gerekli.</p>
+      </div>
+
+      <!-- Aktif oylama kartı -->
+      <div id="active-voting-card" class="card hidden">
+        <h2>Aktif Oylama</h2>
+        <p id="voting-title-display" class="voting-title"></p>
+        <div class="vote-counts">
+          <div class="vote-box evet">
+            <span class="vote-label">EVET</span>
+            <span id="yes-count" class="vote-number">0</span>
+          </div>
+          <div class="vote-box hayir">
+            <span class="vote-label">HAYIR</span>
+            <span id="no-count" class="vote-number">0</span>
+          </div>
+        </div>
+        <button id="finalize-btn" class="btn-danger">Oylamayı Kapat</button>
+      </div>
+
+      <!-- Sonuç kartı -->
+      <div id="result-card" class="card hidden">
+        <h2>Sonuç</h2>
+        <div id="result-display" class="result"></div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/ws_client.js"></script>
+  <script src="js/moderator.js"></script>
+</body>
+</html>

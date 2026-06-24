@@ -1,0 +1,13 @@
+[project]
+name = "bridge"
+version = "0.1.0"
+description = "Yüz tanıma köprü servisi — meclis yoklama sistemi"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+bridge = "bridge.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
