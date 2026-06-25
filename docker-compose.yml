@@ -1,0 +1,52 @@
+version: '3.9'
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: meclis-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: meclis
+    ports:
+      - "5433:5432"
+    volumes:
+      - meclis_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: meclis-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/meclis?sslmode=disable
+      BRIDGE_SECRET: dev-secret-change-me
+      SESSION_SECRET: dev-session-secret-change-me
+    ports:
+      - "8080:8080"
+
+  bridge:
+    build:
+      context: ./bridge
+      dockerfile: Dockerfile
+    container_name: meclis-bridge
+    depends_on:
+      - backend
+    environment:
+      BACKEND_URL: http://backend:8080
+      BRIDGE_SECRET: dev-secret-change-me
+      POLL_INTERVAL_SEC: "3.0"
+      SIM_MEMBER_COUNT: "32"
+
+volumes:
+  meclis_pg_data:

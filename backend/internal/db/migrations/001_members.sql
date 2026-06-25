@@ -7,17 +7,15 @@ CREATE TABLE IF NOT EXISTS members (
     created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
--- Moderatörü manuel ekleyelim
-INSERT INTO members (name, tc_no, password_hash, role) 
-VALUES ('Test Moderatör', '10000000000', '$2a$10$placeholder', 'moderator')
+INSERT INTO members (name, tc_no, password_hash, role) VALUES
+    ('Test Moderatör', '10000000000', '$2a$10$bdYsqhyqMEgagrkbks7uV./Ag6Yeu9NTs/ETmrPpoq2hxBUhDGS1q', 'moderator')
 ON CONFLICT DO NOTHING;
 
--- 35 Tane normal üyeyi otomatik oluşturalım
 INSERT INTO members (name, tc_no, password_hash, role)
 SELECT 
-    'Üye ' || i, 
-    (10000000000 + i)::text, 
-    '$2a$10$placeholder', 
-    'member'
-FROM generate_series(1, 35) AS i
+  'Üye ' || i,
+  '1000000' || LPAD(i::text, 4, '0'),
+  '$2a$10$5OK320wCLl0vkcRoyRKZ/uIpRNonSqY/IidNui9VLox9IfnMQQKRu',
+  'member'
+FROM generate_series(1, 32) AS i
 ON CONFLICT DO NOTHING;

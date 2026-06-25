@@ -5,13 +5,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"time"
 )
 
+const ToplamUye = 32
+
+type EsikTipi string
+
 const (
-	MinPresent  = 16
-	MinYesVotes = 17
+	Oybirligi    EsikTipi = "oybirligi"
+	SaltCogunluk EsikTipi = "salt_cogunluk"
+	IkideUc      EsikTipi = "iki_uc"
+	UcteUc       EsikTipi = "uc_dort"
 )
+
+func hesaplaEsik(esik EsikTipi, toplam int) int {
+	switch esik {
+	case Oybirligi:
+		return toplam
+	case IkideUc:
+		return int(math.Ceil(float64(toplam) * 2 / 3))
+	case UcteUc:
+		return int(math.Ceil(float64(toplam) * 3 / 4))
+	default: // SaltCogunluk
+		return toplam/2 + 1
+	}
+}
 
 type Service struct {
 	db  *sql.DB
@@ -23,50 +43,61 @@ func NewService(db *sql.DB, hub *Hub) *Service {
 }
 
 type Voting struct {
-	ID        int        `json:"id"`
-	MeetingID string     `json:"meeting_id"`
-	Title     string     `json:"title"`
-	Status    string     `json:"status"`
-	Result    *string    `json:"result,omitempty"`
-	StartedAt *time.Time `json:"started_at,omitempty"`
+	ID         int        `json:"id"`
+	MeetingID  string     `json:"meeting_id"`
+	Title      string     `json:"title"`
+	Status     string     `json:"status"`
+	OylamaTipi string     `json:"oylama_tipi"`
+	EsikTipi   string     `json:"esik_tipi"`
+	EsikSayi   int        `json:"esik_sayi"`
+	Result     *string    `json:"result,omitempty"`
+	StartedAt  *time.Time `json:"started_at,omitempty"`
 }
 
-// Start — yeni oylama başlatır, tüm bağlı üyelere yayın yapar
-func (s *Service) Start(meetingID, title string, presentCount int) (*Voting, error) {
-	if presentCount < MinPresent {
-		return nil, fmt.Errorf("yetersiz üye: %d (minimum %d)", presentCount, MinPresent)
+type StartParams struct {
+	MeetingID    string
+	Title        string
+	OylamaTipi   string // "gizli" | "acik"
+	EsikTipi     EsikTipi
+	PresentCount int
+}
+
+func (s *Service) Start(p StartParams) (*Voting, error) {
+	if p.PresentCount < 16 {
+		return nil, fmt.Errorf("yetersiz üye: %d (minimum 16)", p.PresentCount)
 	}
+
+	esikSayi := hesaplaEsik(p.EsikTipi, ToplamUye)
 
 	now := time.Now()
 	var v Voting
 	query := `
-		INSERT INTO votings (meeting_id, title, status, started_at)
-		VALUES ($1, $2, 'active', $3)
-		RETURNING id, meeting_id, title, status, started_at
+		INSERT INTO votings (meeting_id, title, status, oylama_tipi, esik_tipi, esik_sayi, toplam_uye, started_at)
+		VALUES ($1, $2, 'active', $3, $4, $5, $6, $7)
+		RETURNING id, meeting_id, title, status, oylama_tipi, esik_tipi, esik_sayi, started_at
 	`
-	err := s.db.QueryRow(query, meetingID, title, now).Scan(
-		&v.ID, &v.MeetingID, &v.Title, &v.Status, &v.StartedAt,
-	)
+	err := s.db.QueryRow(query,
+		p.MeetingID, p.Title, p.OylamaTipi, string(p.EsikTipi), esikSayi, ToplamUye, now,
+	).Scan(&v.ID, &v.MeetingID, &v.Title, &v.Status, &v.OylamaTipi, &v.EsikTipi, &v.EsikSayi, &v.StartedAt)
 	if err != nil {
 		return nil, fmt.Errorf("oylama oluşturulamadı: %w", err)
 	}
 
-	// Tüm bağlı üyelere anlık bildirim gönder
 	msg, _ := json.Marshal(map[string]any{
-		"type":       "voting_started",
-		"voting_id":  v.ID,
-		"title":      v.Title,
-		"started_at": v.StartedAt,
+		"type":        "voting_started",
+		"voting_id":   v.ID,
+		"title":       v.Title,
+		"oylama_tipi": v.OylamaTipi,
+		"esik_sayi":   v.EsikSayi,
+		"started_at":  v.StartedAt,
 	})
 	s.hub.Broadcast(msg)
-	log.Printf("Oylama başlatıldı → ID: %d, başlık: %s", v.ID, v.Title)
+	log.Printf("Oylama başlatıldı → ID: %d, tip: %s, eşik: %d", v.ID, p.OylamaTipi, esikSayi)
 
 	return &v, nil
 }
 
-// CastVote — üye oyunu kullanır
 func (s *Service) CastVote(votingID, memberID int, choice string) error {
-	// Oylama aktif mi?
 	var status string
 	err := s.db.QueryRow(`SELECT status FROM votings WHERE id = $1`, votingID).Scan(&status)
 	if err == sql.ErrNoRows {
@@ -86,20 +117,24 @@ func (s *Service) CastVote(votingID, memberID int, choice string) error {
 		return fmt.Errorf("oy kaydedilemedi: %w", err)
 	}
 
-	// Anlık oy sayısını yayınla
 	s.broadcastCounts(votingID)
 	return nil
 }
 
-// Finalize — oylamayı kapatır, sonucu mühürler
 func (s *Service) Finalize(votingID int) (*Voting, error) {
+	var esikSayi int
+	var oylamaTipi string
+	s.db.QueryRow(
+		`SELECT esik_sayi, oylama_tipi FROM votings WHERE id = $1`, votingID,
+	).Scan(&esikSayi, &oylamaTipi)
+
 	var yesCount int
 	s.db.QueryRow(
 		`SELECT COUNT(*) FROM votes WHERE voting_id = $1 AND choice = 'evet'`, votingID,
 	).Scan(&yesCount)
 
 	result := "reddedildi"
-	if yesCount >= MinYesVotes {
+	if yesCount >= esikSayi {
 		result = "kabul_edildi"
 	}
 
@@ -107,10 +142,10 @@ func (s *Service) Finalize(votingID int) (*Voting, error) {
 	query := `
 		UPDATE votings SET status = 'closed', result = $2, ended_at = NOW()
 		WHERE id = $1
-		RETURNING id, meeting_id, title, status, result, started_at
+		RETURNING id, meeting_id, title, status, oylama_tipi, esik_tipi, esik_sayi, result, started_at
 	`
 	err := s.db.QueryRow(query, votingID, result).Scan(
-		&v.ID, &v.MeetingID, &v.Title, &v.Status, &v.Result, &v.StartedAt,
+		&v.ID, &v.MeetingID, &v.Title, &v.Status, &v.OylamaTipi, &v.EsikTipi, &v.EsikSayi, &v.Result, &v.StartedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("oylama kapatılamadı: %w", err)
@@ -121,23 +156,27 @@ func (s *Service) Finalize(votingID int) (*Voting, error) {
 		"voting_id": v.ID,
 		"result":    result,
 		"yes_count": yesCount,
+		"esik_sayi": esikSayi,
 	})
 	s.hub.Broadcast(msg)
-	log.Printf("Oylama kapandı → ID: %d, sonuç: %s (%d evet)", votingID, result, yesCount)
+	log.Printf("Oylama kapandı → ID: %d, sonuç: %s (%d/%d evet)", v.ID, result, yesCount, esikSayi)
 
 	return &v, nil
 }
 
 func (s *Service) broadcastCounts(votingID int) {
 	var yes, no int
+	var oylamaTipi string
 	s.db.QueryRow(`SELECT COUNT(*) FROM votes WHERE voting_id=$1 AND choice='evet'`, votingID).Scan(&yes)
 	s.db.QueryRow(`SELECT COUNT(*) FROM votes WHERE voting_id=$1 AND choice='hayir'`, votingID).Scan(&no)
+	s.db.QueryRow(`SELECT oylama_tipi FROM votings WHERE id=$1`, votingID).Scan(&oylamaTipi)
 
 	msg, _ := json.Marshal(map[string]any{
-		"type":      "vote_update",
-		"voting_id": votingID,
-		"yes":       yes,
-		"no":        no,
+		"type":        "vote_update",
+		"voting_id":   votingID,
+		"yes":         yes,
+		"no":          no,
+		"oylama_tipi": oylamaTipi,
 	})
 	s.hub.Broadcast(msg)
 }

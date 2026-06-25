@@ -14,6 +14,8 @@ function showVoting(title) {
   document.getElementById('voting-title').textContent = title;
   document.getElementById('voted-msg').classList.add('hidden');
   document.getElementById('vote-buttons').classList.remove('hidden');
+  document.getElementById('evet-btn').disabled  = false;
+  document.getElementById('hayir-btn').disabled = false;
   hasVoted = false;
 }
 
@@ -59,6 +61,17 @@ async function castVote(choice) {
   document.getElementById('voted-msg').classList.remove('hidden');
 }
 
+// Sayfa açılınca aktif oylama var mı kontrol et
+async function checkActiveVoting() {
+  const res = await fetch(`${API}/voting/active`, { credentials: 'include' }).catch(() => null);
+  if (!res || !res.ok) return;
+  const data = await res.json();
+  if (data.active) {
+    currentVotingId = data.id;
+    showVoting(data.title);
+  }
+}
+
 // WebSocket mesajları
 ws.on('voting_started', (msg) => {
   currentVotingId = msg.voting_id;
@@ -68,8 +81,10 @@ ws.on('voting_started', (msg) => {
 ws.on('voting_closed', (msg) => {
   showResult(msg.result);
   currentVotingId = null;
+  hasVoted = false;
 });
 
 // Başlat
 ws.connect();
 showWaiting();
+checkActiveVoting();

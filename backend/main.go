@@ -40,6 +40,11 @@ func main() {
 	}
 	defer database.Close()
 
+	// Migration'ları otomatik çalıştır
+	if err := db.RunMigrations(database, "internal/db/migrations"); err != nil {
+		log.Fatalf("Migration hatası: %v", err)
+	}
+
 	// Servisler
 	attendanceSvc := attendance.NewService(database)
 	hub := voting.NewHub()
@@ -47,6 +52,9 @@ func main() {
 
 	// Handler'lar
 	attendanceHandler := attendance.NewHandler(attendanceSvc, cfg.BridgeSecret, defaultMeetingID)
+	membersHandler := auth.NewMembersHandler(database)
+	huzurHandler := auth.NewHuzurHandler(database, defaultMeetingID)
+	meetingHandler := auth.NewMeetingHandler(database)
 	authHandler := auth.NewHandler(database, attendanceSvc, defaultMeetingID)
 	votingHandler := voting.NewHandler(votingSvc, hub, attendanceSvc, defaultMeetingID)
 
@@ -95,6 +103,21 @@ func main() {
 		protected.POST("/voting/:id/vote", votingHandler.CastVote)
 		protected.POST("/voting/:id/finalize", votingHandler.Finalize)
 		protected.GET("/voting/ws", votingHandler.WS)
+		protected.GET("/voting/active", votingHandler.GetActive)
+		protected.GET("/voting/recent", votingHandler.GetRecent)
+		protected.GET("/attendance/present", attendanceHandler.GetPresent)
+		protected.GET("/members", membersHandler.List)
+		protected.GET("/reports/votings", votingHandler.GetReport)
+		protected.GET("/reports/votings/:id/detail", votingHandler.GetVoteDetail)
+		protected.GET("/huzur/list", huzurHandler.List)
+		protected.POST("/huzur/settings", huzurHandler.SaveSettings)
+		protected.GET("/huzur/roles", huzurHandler.GetRoles)
+		protected.POST("/huzur/member-role", huzurHandler.SetMemberRole)
+		protected.GET("/meetings", meetingHandler.List)
+		protected.POST("/meetings", meetingHandler.Create)
+		protected.POST("/meetings/:id/start", meetingHandler.Start)
+		protected.POST("/meetings/:id/end", meetingHandler.End)
+		protected.GET("/meetings/active", meetingHandler.GetActive)
 	}
 
 	log.Printf("Sunucu başlatılıyor → :%s", cfg.Port)

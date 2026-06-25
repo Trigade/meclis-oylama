@@ -1,0 +1,176 @@
+/* ── Layout ── */
+.mod-body { margin: 0; overflow-x: hidden; }
+
+.mod-topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 56px;
+  background: #1e293b;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  gap: 1rem;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.mod-topbar-title { font-weight: 700; font-size: 1rem; flex: 1; }
+.mod-topbar .btn-ghost { color: #94a3b8; border-color: #334155; }
+.mod-topbar .btn-ghost:hover { color: #fff; border-color: #fff; }
+
+.mod-menu-toggle {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  display: none;
+}
+
+.mod-layout {
+  display: flex;
+  margin-top: 56px;
+  min-height: calc(100vh - 56px);
+}
+
+/* ── Sidebar ── */
+.mod-sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: #1e293b;
+  padding: 1rem 0;
+  position: fixed;
+  top: 56px;
+  bottom: 0;
+  left: 0;
+  overflow-y: auto;
+  z-index: 90;
+  transition: transform 0.25s ease;
+}
+
+.mod-nav { list-style: none; padding: 0; margin: 0; }
+
+.mod-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.7rem 1.25rem;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+
+.mod-nav-item:hover { background: #273549; color: #e2e8f0; }
+.mod-nav-item.active { background: #2563eb; color: #fff; font-weight: 600; }
+.mod-nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+
+/* ── Content ── */
+.mod-content {
+  margin-left: 220px;
+  flex: 1;
+  padding: 2rem;
+  background: var(--bg);
+  min-height: calc(100vh - 56px);
+}
+
+.mod-page { max-width: 900px; }
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: var(--text);
+}
+
+/* ── Stat grid (Panel) ── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.stat-card-value { font-size: 2rem; font-weight: 800; color: var(--primary); }
+.stat-card-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+/* ── Tablo ── */
+.mod-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.mod-table th {
+  text-align: left;
+  padding: 0.625rem 0.875rem;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-bottom: 1px solid var(--border);
+}
+
+.mod-table td {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.mod-table tr:last-child td { border-bottom: none; }
+.mod-table tr:hover td { background: var(--bg); }
+
+/* ── Mobil ── */
+@media (max-width: 768px) {
+  .mod-menu-toggle { display: block; }
+
+  .mod-sidebar {
+    transform: translateX(-100%);
+  }
+
+  .mod-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .mod-content {
+    margin-left: 0;
+    padding: 1rem;
+  }
+
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+}
+
+
+/* ── Modal ── */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.modal-box {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 2rem;
+  width: 90%;
+  max-width: 700px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}

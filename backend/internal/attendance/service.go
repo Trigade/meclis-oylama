@@ -71,3 +71,37 @@ func (s *Service) IsMemberPresent(meetingID string, memberID int) (bool, error) 
 	}
 	return exists, nil
 }
+
+type PresentMember struct {
+	ID      int    `json:"id"`
+	Name    string `json:"name"`
+	Soyisim string `json:"soyisim"`
+	Parti   string `json:"parti"`
+	TC      string `json:"tc_no"`
+}
+
+func (s *Service) GetPresentMembers(meetingID string) ([]PresentMember, error) {
+	query := `
+		SELECT m.id, m.name, COALESCE(m.soyisim, ''), COALESCE(m.parti, ''), m.tc_no
+		FROM attendance_sessions a
+		JOIN members m ON m.id = a.member_id
+		WHERE a.meeting_id = $1 AND a.exited_at IS NULL
+		ORDER BY m.name
+	`
+	rows, err := s.db.Query(query, meetingID)
+	if err != nil {
+		return nil, fmt.Errorf("salondaki üyeler alınamadı: %w", err)
+	}
+	defer rows.Close()
+
+	var members []PresentMember
+	for rows.Next() {
+		var m PresentMember
+		rows.Scan(&m.ID, &m.Name, &m.Soyisim, &m.Parti, &m.TC)
+		members = append(members, m)
+	}
+	if members == nil {
+		members = []PresentMember{}
+	}
+	return members, nil
+}

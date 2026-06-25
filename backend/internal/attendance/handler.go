@@ -29,7 +29,6 @@ type eventRequest struct {
 
 // POST /api/bridge/attendance
 func (h *Handler) HandleEvent(c *gin.Context) {
-	// Köprü servisi gizli anahtarını doğrula
 	if c.GetHeader("X-Bridge-Secret") != h.secret {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "geçersiz bridge secret"})
 		return
@@ -56,10 +55,7 @@ func (h *Handler) HandleEvent(c *gin.Context) {
 	}
 
 	count, _ := h.service.CountPresent(h.meetingID)
-	c.JSON(http.StatusOK, gin.H{
-		"ok":            true,
-		"present_count": count,
-	})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "present_count": count})
 }
 
 // GET /api/attendance/count
@@ -70,4 +66,14 @@ func (h *Handler) GetCount(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"present_count": count})
+}
+
+// GET /api/attendance/present
+func (h *Handler) GetPresent(c *gin.Context) {
+	members, err := h.service.GetPresentMembers(h.meetingID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "üye listesi alınamadı"})
+		return
+	}
+	c.JSON(http.StatusOK, members)
 }

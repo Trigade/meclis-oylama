@@ -1,0 +1,6 @@
+ALTER TABLE members
+  ADD COLUMN IF NOT EXISTS soyisim    VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS parti      VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS tc_no_goster BOOLEAN DEFAULT true;
+
+UPDATE members SET soyisim = 'Test' WHERE soyisim IS NULL;

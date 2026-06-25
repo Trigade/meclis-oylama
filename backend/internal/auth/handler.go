@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Handler struct {
@@ -56,6 +57,12 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
+	// Bcrypt şifre doğrulama
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "geçersiz kimlik bilgileri"})
+		return
+	}
+
 	// Salonda mı kontrol et (Moderatör muaf)
 	if member.Role != "moderator" {
 		present, err := h.attendance.IsMemberPresent(h.meetingID, member.ID)
@@ -69,15 +76,14 @@ func (h *Handler) Login(c *gin.Context) {
 		}
 	}
 
-	// HTTP-Only cookie bas (DÜZELTİLDİ)
 	c.SetCookie(
 		"session_member_id",
 		strconv.Itoa(member.ID),
-		3600*8, // 8 saat
+		3600*8,
 		"/",
 		"",
-		false, // geliştirmede false, prodda true (HTTPS)
-		true,  // HTTP-Only
+		false,
+		true,
 	)
 
 	c.JSON(http.StatusOK, gin.H{
