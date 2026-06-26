@@ -10,18 +10,18 @@ import (
 )
 
 type Handler struct {
-	service    *Service
-	hub        *Hub
-	attendance *attendance.Service
-	meetingID  string
+	service      *Service
+	hub          *Hub
+	attendance   *attendance.Service
+	getMeetingID func() string
 }
 
-func NewHandler(service *Service, hub *Hub, attendance *attendance.Service, meetingID string) *Handler {
+func NewHandler(service *Service, hub *Hub, attendance *attendance.Service, getMeetingID func() string) *Handler {
 	return &Handler{
-		service:    service,
-		hub:        hub,
-		attendance: attendance,
-		meetingID:  meetingID,
+		service:      service,
+		hub:          hub,
+		attendance:   attendance,
+		getMeetingID: getMeetingID,
 	}
 }
 
@@ -43,14 +43,16 @@ func (h *Handler) Start(c *gin.Context) {
 		return
 	}
 
-	count, err := h.attendance.CountPresent(h.meetingID)
+	// HATA DÜZELTİLDİ: h.getMeetingID()() -> h.getMeetingID()
+	count, err := h.attendance.CountPresent(h.getMeetingID())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "üye sayısı alınamadı"})
 		return
 	}
 
+	// HATA DÜZELTİLDİ: h.getMeetingID()() -> h.getMeetingID()
 	voting, err := h.service.Start(StartParams{
-		MeetingID:    h.meetingID,
+		MeetingID:    h.getMeetingID(),
 		Title:        req.Title,
 		OylamaTipi:   req.OylamaTipi,
 		EsikTipi:     EsikTipi(req.EsikTipi),
@@ -117,9 +119,9 @@ func (h *Handler) GetActive(c *gin.Context) {
 	var esikSayi int
 
 	err := h.service.db.QueryRow(`
-		SELECT id, title, oylama_tipi, esik_tipi, esik_sayi
-		FROM votings WHERE status = 'active' ORDER BY id DESC LIMIT 1
-	`).Scan(&id, &title, &oylamaTipi, &esikTipi, &esikSayi)
+        SELECT id, title, oylama_tipi, esik_tipi, esik_sayi
+        FROM votings WHERE status = 'active' ORDER BY id DESC LIMIT 1
+    `).Scan(&id, &title, &oylamaTipi, &esikTipi, &esikSayi)
 
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"active": false})
@@ -145,9 +147,9 @@ func (h *Handler) GetActive(c *gin.Context) {
 // GET /api/voting/recent
 func (h *Handler) GetRecent(c *gin.Context) {
 	rows, err := h.service.db.Query(`
-		SELECT id, title, oylama_tipi, esik_tipi, esik_sayi, status, result, started_at, ended_at
-		FROM votings ORDER BY id DESC LIMIT 10
-	`)
+        SELECT id, title, oylama_tipi, esik_tipi, esik_sayi, status, result, started_at, ended_at
+        FROM votings ORDER BY id DESC LIMIT 10
+    `)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "sorgu hatası"})
 		return
@@ -181,16 +183,16 @@ func (h *Handler) GetRecent(c *gin.Context) {
 // GET /api/reports/votings
 func (h *Handler) GetReport(c *gin.Context) {
 	rows, err := h.service.db.Query(`
-		SELECT 
-			v.id, v.title, v.oylama_tipi, v.esik_tipi, v.esik_sayi,
-			v.status, v.result, v.started_at, v.ended_at,
-			COUNT(CASE WHEN vo.choice = 'evet' THEN 1 END) as yes_count,
-			COUNT(CASE WHEN vo.choice = 'hayir' THEN 1 END) as no_count
-		FROM votings v
-		LEFT JOIN votes vo ON vo.voting_id = v.id
-		GROUP BY v.id
-		ORDER BY v.id DESC
-	`)
+        SELECT 
+            v.id, v.title, v.oylama_tipi, v.esik_tipi, v.esik_sayi,
+            v.status, v.result, v.started_at, v.ended_at,
+            COUNT(CASE WHEN vo.choice = 'evet' THEN 1 END) as yes_count,
+            COUNT(CASE WHEN vo.choice = 'hayir' THEN 1 END) as no_count
+        FROM votings v
+        LEFT JOIN votes vo ON vo.voting_id = v.id
+        GROUP BY v.id
+        ORDER BY v.id DESC
+    `)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "raporlar alınamadı"})
 		return
@@ -245,12 +247,12 @@ func (h *Handler) GetVoteDetail(c *gin.Context) {
 	}
 
 	rows, err := h.service.db.Query(`
-		SELECT m.id, m.name, COALESCE(m.soyisim,''), COALESCE(m.parti,''), vo.choice, vo.cast_at
-		FROM votes vo
-		JOIN members m ON m.id = vo.member_id
-		WHERE vo.voting_id = $1
-		ORDER BY m.name
-	`, votingID)
+        SELECT m.id, m.name, COALESCE(m.soyisim,''), COALESCE(m.parti,''), vo.choice, vo.cast_at
+        FROM votes vo
+        JOIN members m ON m.id = vo.member_id
+        WHERE vo.voting_id = $1
+        ORDER BY m.name
+    `, votingID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "detay alınamadı"})
 		return

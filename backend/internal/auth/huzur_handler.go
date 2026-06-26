@@ -8,12 +8,12 @@ import (
 )
 
 type HuzurHandler struct {
-	db        *sql.DB
-	meetingID string
+	db           *sql.DB
+	getMeetingID func() string
 }
 
-func NewHuzurHandler(db *sql.DB, meetingID string) *HuzurHandler {
-	return &HuzurHandler{db: db, meetingID: meetingID}
+func NewHuzurHandler(db *sql.DB, getMeetingID func() string) *HuzurHandler {
+	return &HuzurHandler{db: db, getMeetingID: getMeetingID}
 }
 
 type HuzurRow struct {
@@ -33,7 +33,7 @@ func (h *HuzurHandler) List(c *gin.Context) {
 	var tabanTutar float64
 	h.db.QueryRow(
 		`SELECT taban_tutar FROM huzur_hakki_settings WHERE meeting_id = $1`,
-		h.meetingID,
+		h.getMeetingID(),
 	).Scan(&tabanTutar)
 
 	rows, err := h.db.Query(`
@@ -53,7 +53,7 @@ func (h *HuzurHandler) List(c *gin.Context) {
 		LEFT JOIN member_roles mr ON mr.id = m.member_role_id
 		WHERE m.role = 'member'
 		ORDER BY mr.katsayi DESC, m.name
-	`, h.meetingID)
+	`, h.getMeetingID())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "liste alınamadı"})
 		return
@@ -93,7 +93,7 @@ func (h *HuzurHandler) SaveSettings(c *gin.Context) {
 		INSERT INTO huzur_hakki_settings (meeting_id, taban_tutar)
 		VALUES ($1, $2)
 		ON CONFLICT (meeting_id) DO UPDATE SET taban_tutar = $2
-	`, h.meetingID, req.TabanTutar)
+	`, h.getMeetingID(), req.TabanTutar)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "kayıt başarısız"})
 		return

@@ -10,6 +10,7 @@ import (
 	"meclis-oylama/backend/internal/attendance"
 	"meclis-oylama/backend/internal/auth"
 	"meclis-oylama/backend/internal/db"
+	"meclis-oylama/backend/internal/session"
 	"meclis-oylama/backend/internal/voting"
 
 	"github.com/gin-gonic/gin"
@@ -45,19 +46,28 @@ func main() {
 		log.Fatalf("Migration hatası: %v", err)
 	}
 
+	// Aktif oturumu yükle
+	activeSess := session.NewActiveSession()
+	if err := activeSess.LoadFromDB(database); err != nil {
+		log.Printf("Aktif oturum yüklenemedi: %v", err)
+	}
+
 	// Servisler
 	attendanceSvc := attendance.NewService(database)
+	auditSvc := auth.NewAuditService(database)
 	hub := voting.NewHub()
 	votingSvc := voting.NewService(database, hub)
 
 	// Handler'lar
-	attendanceHandler := attendance.NewHandler(attendanceSvc, cfg.BridgeSecret, defaultMeetingID)
-	membersHandler := auth.NewMembersHandler(database)
-	huzurHandler := auth.NewHuzurHandler(database, defaultMeetingID)
-	meetingHandler := auth.NewMeetingHandler(database)
-	authHandler := auth.NewHandler(database, attendanceSvc, defaultMeetingID)
-	votingHandler := voting.NewHandler(votingSvc, hub, attendanceSvc, defaultMeetingID)
-
+	membersHandler := auth.NewMembersHandler(database, auditSvc)
+	auditHandler := auth.NewAuditHandler(database)
+	meetingHandler := auth.NewMeetingHandler(database, auditSvc, activeSess)
+	komisyonHandler := auth.NewKomisyonHandler(database, auditSvc)
+	attendanceHandler := attendance.NewHandler(attendanceSvc, cfg.BridgeSecret, activeSess.Get)
+	authHandler := auth.NewHandler(database, attendanceSvc, activeSess.Get, auditSvc)
+	votingHandler := voting.NewHandler(votingSvc, hub, attendanceSvc, activeSess.Get)
+	huzurHandler := auth.NewHuzurHandler(database, activeSess.Get)
+	salonHandler := auth.NewSalonHandler(database, activeSess.Get)
 	// WebSocket hub'ı arka planda başlat
 	go hub.Run()
 
@@ -118,6 +128,21 @@ func main() {
 		protected.POST("/meetings/:id/start", meetingHandler.Start)
 		protected.POST("/meetings/:id/end", meetingHandler.End)
 		protected.GET("/meetings/active", meetingHandler.GetActive)
+		protected.POST("/members", membersHandler.Create)
+		protected.PUT("/members/:id", membersHandler.Update)
+		protected.DELETE("/members/:id", membersHandler.Delete)
+		protected.POST("/members/:id/reset-password", membersHandler.ResetPassword)
+		protected.GET("/salon/seats", salonHandler.GetSeats)
+		protected.GET("/audit", auditHandler.List)
+		protected.GET("/komisyonlar", komisyonHandler.List)
+		protected.POST("/komisyonlar", komisyonHandler.Create)
+		protected.POST("/komisyonlar/:id/end", komisyonHandler.End)
+		protected.GET("/komisyonlar/:id/uyeler", komisyonHandler.GetUyeler)
+		protected.POST("/komisyonlar/:id/uyeler", komisyonHandler.AddUye)
+		protected.DELETE("/komisyonlar/:id/uyeler/:mid", komisyonHandler.RemoveUye)
+		protected.GET("/komisyonlar/:id/kararlar", komisyonHandler.GetKararlar)
+		protected.POST("/komisyonlar/:id/kararlar", komisyonHandler.AddKarar)
+		protected.DELETE("/komisyonlar/:id/kararlar/:kid", komisyonHandler.DeleteKarar)
 	}
 
 	log.Printf("Sunucu başlatılıyor → :%s", cfg.Port)

@@ -2,17 +2,20 @@ package auth
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 type MeetingHandler struct {
-	db *sql.DB
+	db         *sql.DB
+	audit      *AuditService
+	activeSess interface{ Set(string) }
 }
 
-func NewMeetingHandler(db *sql.DB) *MeetingHandler {
-	return &MeetingHandler{db: db}
+func NewMeetingHandler(db *sql.DB, audit *AuditService, activeSess interface{ Set(string) }) *MeetingHandler {
+	return &MeetingHandler{db: db, audit: audit, activeSess: activeSess}
 }
 
 type Meeting struct {
@@ -100,6 +103,16 @@ func (h *MeetingHandler) Start(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "oturum başlatılamadı"})
 		return
 	}
+
+	h.activeSess.Set(fmt.Sprintf("meeting-%d", m.ID))
+
+	h.audit.Log(AuditEntry{
+		Action:     "meeting_start",
+		TargetType: "meeting",
+		TargetID:   id,
+		Detail:     m.Title,
+		IP:         c.ClientIP(),
+	})
 	c.JSON(http.StatusOK, m)
 }
 
@@ -117,6 +130,16 @@ func (h *MeetingHandler) End(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "oturum kapatılamadı"})
 		return
 	}
+
+	h.activeSess.Set("meeting-default")
+
+	h.audit.Log(AuditEntry{
+		Action:     "meeting_end",
+		TargetType: "meeting",
+		TargetID:   id,
+		Detail:     m.Title,
+		IP:         c.ClientIP(),
+	})
 	c.JSON(http.StatusOK, m)
 }
 

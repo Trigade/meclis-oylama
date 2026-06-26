@@ -10,17 +10,18 @@ import (
 )
 
 type Handler struct {
-	db         *sql.DB
-	attendance AttendanceChecker
-	meetingID  string
+	db           *sql.DB
+	attendance   AttendanceChecker
+	getMeetingID func() string
+	audit        *AuditService
+}
+
+func NewHandler(db *sql.DB, attendance AttendanceChecker, getMeetingID func() string, audit *AuditService) *Handler {
+	return &Handler{db: db, attendance: attendance, getMeetingID: getMeetingID, audit: audit}
 }
 
 type AttendanceChecker interface {
 	IsMemberPresent(meetingID string, memberID int) (bool, error)
-}
-
-func NewHandler(db *sql.DB, attendance AttendanceChecker, meetingID string) *Handler {
-	return &Handler{db: db, attendance: attendance, meetingID: meetingID}
 }
 
 type loginRequest struct {
@@ -57,15 +58,13 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	// Bcrypt şifre doğrulama
 	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "geçersiz kimlik bilgileri"})
 		return
 	}
 
-	// Salonda mı kontrol et (Moderatör muaf)
 	if member.Role != "moderator" {
-		present, err := h.attendance.IsMemberPresent(h.meetingID, member.ID)
+		present, err := h.attendance.IsMemberPresent(h.getMeetingID(), member.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "yoklama kontrol hatası"})
 			return
@@ -76,24 +75,28 @@ func (h *Handler) Login(c *gin.Context) {
 		}
 	}
 
-	c.SetCookie(
-		"session_member_id",
-		strconv.Itoa(member.ID),
-		3600*8,
-		"/",
-		"",
-		false,
-		true,
-	)
+	c.SetCookie("session_member_id", strconv.Itoa(member.ID), 3600*8, "/", "", false, true)
 
-	c.JSON(http.StatusOK, gin.H{
-		"ok":     true,
-		"member": member,
+	h.audit.Log(AuditEntry{
+		ActorID:   &member.ID,
+		ActorName: member.Name,
+		Action:    "login",
+		IP:        c.ClientIP(),
 	})
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "member": member})
 }
 
 // POST /api/auth/logout
 func (h *Handler) Logout(c *gin.Context) {
+	if memberID, exists := c.Get("member_id"); exists {
+		id := memberID.(int)
+		h.audit.Log(AuditEntry{
+			ActorID: &id,
+			Action:  "logout",
+			IP:      c.ClientIP(),
+		})
+	}
 	c.SetCookie("session_member_id", "", -1, "/", "", false, true)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }

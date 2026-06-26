@@ -21,6 +21,10 @@ document.querySelectorAll('.mod-nav-item').forEach(item => {
     if (item.dataset.page === 'raporlar') loadRaporlar();
     if (item.dataset.page === 'huzur-hakki') loadHuzur();
     if (item.dataset.page === 'oturumlar') loadOturumlar();
+    if (item.dataset.page === 'kullanicilar') loadKullanicilar();
+    if (item.dataset.page === 'salon') loadSalon();
+    if (item.dataset.page === 'denetim') loadDenetim();
+    if (item.dataset.page === 'komisyonlar') loadKomisyonlar();
   });
 });
 
@@ -536,6 +540,476 @@ async function endOturum(id) {
   const data = await res.json();
   if (res.ok) { loadOturumlar(); loadPanel(); }
   else { alert(data.error || 'Oturum kapatılamadı.'); }
+}
+
+// ── Kullanıcılar ──
+let selectedUyeId = null;
+let selectedSifreId = null;
+
+async function loadKullanicilar() {
+  const res = await fetch(`${API}/members`, { credentials: 'include' });
+  const el  = document.getElementById('kullanici-listesi');
+
+  if (!res.ok) { el.innerHTML = '<p class="hint">Üyeler alınamadı.</p>'; return; }
+
+  const list = await res.json();
+  el.innerHTML = `
+    <table class="mod-table">
+      <thead>
+        <tr><th>ID</th><th>Ad Soyad</th><th>TC No</th><th>Parti</th><th>Rol</th><th>İşlem</th></tr>
+      </thead>
+      <tbody>
+        ${list.map(u => `
+          <tr>
+            <td>${u.id}</td>
+            <td>${u.name} ${u.soyisim}</td>
+            <td>${u.tc_no}</td>
+            <td>${u.parti || '—'}</td>
+            <td><span class="badge ${u.role === 'moderator' ? 'badge-ready' : 'badge-waiting'}">${u.role === 'moderator' ? 'Moderatör' : 'Üye'}</span></td>
+            <td style="display:flex;gap:0.25rem;flex-wrap:wrap">
+              <button class="btn-ghost" style="font-size:0.75rem;padding:0.2rem 0.4rem"
+                onclick="openUyeModal(${u.id}, '${u.name}', '${u.soyisim}', '${u.tc_no}', '${u.parti}', '${u.role}')">Düzenle</button>
+              <button class="btn-ghost" style="font-size:0.75rem;padding:0.2rem 0.4rem"
+                onclick="openSifreModal(${u.id}, '${u.name} ${u.soyisim}')">Şifre</button>
+              <button class="btn-ghost" style="font-size:0.75rem;padding:0.2rem 0.4rem;color:var(--danger)"
+                onclick="deleteUye(${u.id}, '${u.name}')">Sil</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+
+  // Arama filtresi
+  document.getElementById('kullanici-ara').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('#kullanici-listesi tbody tr').forEach(row => {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+}
+
+function openUyeModal(id, name, soyisim, tc, parti, role) {
+  selectedUyeId = id || null;
+  document.getElementById('uye-modal-baslik').textContent = id ? 'Üye Düzenle' : 'Yeni Üye';
+  document.getElementById('uye-ad').value    = name    || '';
+  document.getElementById('uye-soyad').value = soyisim || '';
+  document.getElementById('uye-tc').value    = tc      || '';
+  document.getElementById('uye-parti').value = parti   || '';
+  document.getElementById('uye-rol').value   = role    || 'member';
+  document.getElementById('uye-sifre-field').style.display = id ? 'none' : '';
+  document.getElementById('uye-modal').classList.remove('hidden');
+}
+
+function closeUyeModal() {
+  document.getElementById('uye-modal').classList.add('hidden');
+  selectedUyeId = null;
+}
+
+async function saveUye() {
+  const body = {
+    name:     document.getElementById('uye-ad').value.trim(),
+    soyisim:  document.getElementById('uye-soyad').value.trim(),
+    tc_no:    document.getElementById('uye-tc').value.trim(),
+    parti:    document.getElementById('uye-parti').value.trim(),
+    role:     document.getElementById('uye-rol').value,
+  };
+
+  if (!body.name || !body.tc_no) { alert('Ad ve TC no zorunlu.'); return; }
+
+  if (!selectedUyeId) {
+    body.password = document.getElementById('uye-sifre').value;
+    if (!body.password) { alert('Şifre zorunlu.'); return; }
+  }
+
+  const url    = selectedUyeId ? `${API}/members/${selectedUyeId}` : `${API}/members`;
+  const method = selectedUyeId ? 'PUT' : 'POST';
+
+  const res = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json();
+  if (res.ok) { closeUyeModal(); loadKullanicilar(); }
+  else { alert(data.error || 'İşlem başarısız.'); }
+}
+
+async function deleteUye(id, name) {
+  if (!confirm(`"${name}" silinecek. Emin misiniz?`)) return;
+  const res = await fetch(`${API}/members/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (res.ok) { loadKullanicilar(); }
+  else { alert('Silme başarısız.'); }
+}
+
+function openSifreModal(id, name) {
+  selectedSifreId = id;
+  document.getElementById('sifre-modal-uye').textContent = name;
+  document.getElementById('yeni-sifre').value = '';
+  document.getElementById('sifre-modal').classList.remove('hidden');
+}
+
+function closeSifreModal() {
+  document.getElementById('sifre-modal').classList.add('hidden');
+  selectedSifreId = null;
+}
+
+async function resetSifre() {
+  const password = document.getElementById('yeni-sifre').value;
+  if (!password) { alert('Şifre boş olamaz.'); return; }
+
+  const res = await fetch(`${API}/members/${selectedSifreId}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ password }),
+  });
+
+  if (res.ok) { closeSifreModal(); alert('Şifre güncellendi.'); }
+  else { alert('Şifre güncellenemedi.'); }
+}
+
+async function loadSalon() {
+  const res = await fetch(`${API}/salon/seats`, { credentials: 'include' });
+  if (!res.ok) return;
+  const seats = await res.json();
+
+  const blocks = {
+    sol_ust: { label: 'Sol Üst', cols: 2, rows: 4, seats: [] },
+    sol_alt: { label: 'Sol Alt', cols: 2, rows: 5, seats: [] },
+    sag_1:   { label: 'Sağ 1',  cols: 2, rows: 4, seats: [] },
+    sag_2:   { label: 'Sağ 2',  cols: 2, rows: 5, seats: [] },
+    sag_3:   { label: 'Sağ 3',  cols: 2, rows: 5, seats: [] },
+  };
+
+  seats.forEach(s => {
+    if (blocks[s.block_name]) blocks[s.block_name].seats.push(s);
+  });
+
+  const seatHTML = (s) => {
+    const color    = !s.member_id ? '#cbd5e1' : s.present ? '#16a34a' : '#e2e4e9';
+    const txtColor = s.present ? '#fff' : '#374151';
+    const name     = s.name ? s.name.split(' ')[0] : '';
+    return `
+      <div title="${s.name || 'Boş'} ${s.soyisim || ''}" style="
+        background:${color};
+        color:${txtColor};
+        border-radius:6px;
+        padding:0.3rem 0.2rem;
+        font-size:0.65rem;
+        text-align:center;
+        min-height:52px;
+        min-width:52px;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        line-height:1.3;
+        border: 1px solid rgba(0,0,0,0.08);
+      ">
+        <span style="font-size:0.7rem;font-weight:600">${s.seat_no}</span>
+        <span style="font-size:0.6rem;opacity:0.85">${name}</span>
+      </div>`;
+  };
+
+  const blockHTML = (key, block) => `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem">
+      <div style="font-size:0.75rem;color:var(--text-muted);font-weight:500">${block.label}</div>
+      <div style="display:grid;grid-template-columns:repeat(${block.cols},1fr);gap:5px">
+        ${block.seats.map(seatHTML).join('')}
+      </div>
+    </div>`;
+
+  const container = document.getElementById('salon-container');
+  container.innerHTML = `
+    <!-- Başkanlık masası -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:2rem;padding-right:2rem">
+      <div style="
+        border:2px solid #eab308;
+        border-radius:8px;
+        padding:1rem 3rem;
+        color:#eab308;
+        font-weight:600;
+        font-size:0.9rem;
+        text-align:center;
+        min-width:300px;
+      ">Başkan — Moderatör — Katip</div>
+    </div>
+
+    <!-- Ana düzen -->
+    <div style="display:flex;gap:2rem;align-items:flex-start;padding:0 1rem">
+
+      <!-- Sol bloklar -->
+      <div style="display:flex;flex-direction:column;gap:2rem">
+        ${blockHTML('sol_ust', blocks.sol_ust)}
+        ${blockHTML('sol_alt', blocks.sol_alt)}
+      </div>
+
+      <!-- Ok -->
+      <div style="display:flex;align-items:center;justify-content:center;padding-top:3rem;font-size:3rem;color:#94a3b8">⬇</div>
+
+      <!-- Sağ bloklar -->
+      <div style="display:flex;gap:1.5rem;align-items:flex-start;padding-top:1rem">
+        ${blockHTML('sag_1', blocks.sag_1)}
+        ${blockHTML('sag_2', blocks.sag_2)}
+        ${blockHTML('sag_3', blocks.sag_3)}
+      </div>
+
+    </div>`;
+}
+
+// ── Denetim ──
+async function loadDenetim() {
+  const action = document.getElementById('audit-filtre').value;
+  const limit  = document.getElementById('audit-limit').value;
+  const el     = document.getElementById('denetim-listesi');
+
+  const url = `${API}/audit?limit=${limit}${action ? '&action=' + action : ''}`;
+  const res = await fetch(url, { credentials: 'include' });
+
+  if (!res.ok) { el.innerHTML = '<p class="hint">Loglar alınamadı.</p>'; return; }
+
+  const list = await res.json();
+  if (list.length === 0) {
+    el.innerHTML = '<p class="hint">Kayıt bulunamadı.</p>';
+    return;
+  }
+
+  const actionLabel = {
+    login:          '🔑 Giriş',
+    logout:         '🚪 Çıkış',
+    voting_start:   '🗳️ Oylama Başlat',
+    voting_close:   '🔒 Oylama Kapat',
+    member_create:  '➕ Üye Ekle',
+    member_update:  '✏️ Üye Düzenle',
+    member_delete:  '🗑️ Üye Sil',
+    password_reset: '🔐 Şifre Sıfırla',
+    meeting_start:  '▶️ Oturum Başlat',
+    meeting_end:    '⏹️ Oturum Kapat',
+  };
+
+  el.innerHTML = `
+    <table class="mod-table">
+      <thead>
+        <tr><th>Zaman</th><th>Kullanıcı</th><th>İşlem</th><th>Detay</th><th>IP</th></tr>
+      </thead>
+      <tbody>
+        ${list.map(r => `
+          <tr>
+            <td style="white-space:nowrap;font-size:0.8rem">${new Date(r.created_at).toLocaleString('tr-TR')}</td>
+            <td>${r.actor_name || '—'}</td>
+            <td>${actionLabel[r.action] || r.action}</td>
+            <td style="font-size:0.85rem;color:var(--text-muted)">${r.detail || '—'}</td>
+            <td style="font-size:0.8rem;color:var(--text-muted)">${r.ip || '—'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ── Komisyonlar ──
+let activeKomisyonId = null;
+let allMembers = [];
+
+async function loadKomisyonlar() {
+  const res = await fetch(`${API}/komisyonlar`, { credentials: 'include' });
+  const el  = document.getElementById('komisyon-listesi');
+  if (!res.ok) { el.innerHTML = '<p class="hint">Komisyonlar alınamadı.</p>'; return; }
+
+  const list = await res.json();
+  if (list.length === 0) { el.innerHTML = '<p class="hint">Henüz komisyon oluşturulmadı.</p>'; return; }
+
+  el.innerHTML = `
+    <table class="mod-table">
+      <thead>
+        <tr><th>Ad</th><th>Açıklama</th><th>Üye</th><th>Durum</th><th>İşlem</th></tr>
+      </thead>
+      <tbody>
+        ${list.map(k => `
+          <tr>
+            <td>${k.name}</td>
+            <td>${k.aciklama || '—'}</td>
+            <td>${k.uye_sayisi}</td>
+            <td>${k.status === 'active' ? '🟢 Aktif' : '⚫ Sonlandı'}</td>
+            <td>
+              <button class="btn-ghost" style="font-size:0.8rem;padding:0.2rem 0.5rem"
+                onclick="openKomisyonModal(${k.id}, '${k.name}', '${k.status}')">Detay</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function createKomisyon() {
+  const name     = document.getElementById('komisyon-ad').value.trim();
+  const aciklama = document.getElementById('komisyon-aciklama').value.trim();
+  if (!name) { alert('Komisyon adı zorunlu.'); return; }
+
+  const res = await fetch(`${API}/komisyonlar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ name, aciklama }),
+  });
+
+  if (res.ok) {
+    document.getElementById('komisyon-ad').value = '';
+    document.getElementById('komisyon-aciklama').value = '';
+    loadKomisyonlar();
+  } else {
+    const data = await res.json();
+    alert(data.error || 'Oluşturulamadı.');
+  }
+}
+
+async function openKomisyonModal(id, name, status) {
+  activeKomisyonId = id;
+  document.getElementById('komisyon-modal-baslik').textContent = name;
+  document.getElementById('komisyon-end-btn').style.display = status === 'active' ? '' : 'none';
+  document.getElementById('komisyon-modal').classList.remove('hidden');
+
+  // Tüm üyeleri yükle (select için)
+  if (allMembers.length === 0) {
+    const res = await fetch(`${API}/members`, { credentials: 'include' });
+    if (res.ok) allMembers = await res.json();
+  }
+
+  await loadKomisyonUyeler();
+  await loadKomisyonKararlar();
+}
+
+function closeKomisyonModal() {
+  document.getElementById('komisyon-modal').classList.add('hidden');
+  activeKomisyonId = null;
+}
+
+async function loadKomisyonUyeler() {
+  const res = await fetch(`${API}/komisyonlar/${activeKomisyonId}/uyeler`, { credentials: 'include' });
+  const el  = document.getElementById('komisyon-uye-listesi');
+  if (!res.ok) return;
+
+  const uyeler = await res.json();
+  const uyeIds = uyeler.map(u => u.id);
+
+  // Select'i doldur (komisyonda olmayanlar)
+  const select = document.getElementById('komisyon-uye-select');
+  select.innerHTML = allMembers
+    .filter(m => !uyeIds.includes(m.id))
+    .map(m => `<option value="${m.id}">${m.name} ${m.soyisim}</option>`)
+    .join('');
+
+  if (uyeler.length === 0) {
+    el.innerHTML = '<p class="hint">Henüz üye eklenmedi.</p>';
+    return;
+  }
+
+  el.innerHTML = `
+    <table class="mod-table">
+      <thead><tr><th>Ad Soyad</th><th>Parti</th><th>İşlem</th></tr></thead>
+      <tbody>
+        ${uyeler.map(u => `
+          <tr>
+            <td>${u.name} ${u.soyisim}</td>
+            <td>${u.parti || '—'}</td>
+            <td>
+              <button class="btn-ghost" style="font-size:0.75rem;padding:0.2rem 0.4rem;color:var(--danger)"
+                onclick="removeKomisyonUye(${u.id})">Çıkar</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function addKomisyonUye() {
+  const memberId = parseInt(document.getElementById('komisyon-uye-select').value);
+  if (!memberId) return;
+
+  const res = await fetch(`${API}/komisyonlar/${activeKomisyonId}/uyeler`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ member_id: memberId }),
+  });
+
+  if (res.ok) loadKomisyonUyeler();
+}
+
+async function removeKomisyonUye(memberId) {
+  const res = await fetch(`${API}/komisyonlar/${activeKomisyonId}/uyeler/${memberId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (res.ok) loadKomisyonUyeler();
+}
+
+async function loadKomisyonKararlar() {
+  const res = await fetch(`${API}/komisyonlar/${activeKomisyonId}/kararlar`, { credentials: 'include' });
+  const el  = document.getElementById('komisyon-karar-listesi');
+  if (!res.ok) return;
+
+  const list = await res.json();
+  if (list.length === 0) {
+    el.innerHTML = '<p class="hint">Henüz karar eklenmedi.</p>';
+    return;
+  }
+
+  el.innerHTML = `
+    <table class="mod-table">
+      <thead><tr><th>Karar</th><th>Tarih</th><th>İşlem</th></tr></thead>
+      <tbody>
+        ${list.map(k => `
+          <tr>
+            <td>${k.karar_metni}</td>
+            <td style="font-size:0.8rem;color:var(--text-muted)">${new Date(k.created_at).toLocaleString('tr-TR')}</td>
+            <td>
+              <button class="btn-ghost" style="font-size:0.75rem;padding:0.2rem 0.4rem;color:var(--danger)"
+                onclick="deleteKarar(${k.id})">Sil</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function addKarar() {
+  const metin = document.getElementById('karar-metni').value.trim();
+  if (!metin) return;
+
+  const res = await fetch(`${API}/komisyonlar/${activeKomisyonId}/kararlar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ karar_metni: metin }),
+  });
+
+  if (res.ok) {
+    document.getElementById('karar-metni').value = '';
+    loadKomisyonKararlar();
+  }
+}
+
+async function deleteKarar(kid) {
+  if (!confirm('Karar silinecek. Emin misiniz?')) return;
+  const res = await fetch(`${API}/komisyonlar/${activeKomisyonId}/kararlar/${kid}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (res.ok) loadKomisyonKararlar();
+}
+
+async function endKomisyon() {
+  if (!confirm('Komisyonu sonlandırmak istediğinize emin misiniz?')) return;
+  const res = await fetch(`${API}/komisyonlar/${activeKomisyonId}/end`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (res.ok) { closeKomisyonModal(); loadKomisyonlar(); }
 }
 
 setInterval(() => { loadPanel(); refreshOylama(); }, 5000);

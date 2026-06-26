@@ -152,8 +152,53 @@
       <!-- Komisyonlar -->
       <section id="page-komisyonlar" class="mod-page hidden">
         <h1 class="page-title">Komisyonlar</h1>
+
         <div class="card">
-          <p class="hint">🚧 Yapım aşamasında</p>
+          <h2>Yeni Komisyon</h2>
+          <div style="display:flex;gap:1rem;flex-wrap:wrap">
+            <div class="field" style="flex:2;min-width:200px;margin-bottom:0">
+              <label>Komisyon Adı</label>
+              <input type="text" id="komisyon-ad" placeholder="Örn: Bütçe Komisyonu">
+            </div>
+            <div class="field" style="flex:3;min-width:200px;margin-bottom:0">
+              <label>Açıklama</label>
+              <input type="text" id="komisyon-aciklama" placeholder="Kısa açıklama">
+            </div>
+          </div>
+          <button class="btn-primary" style="margin-top:1rem;width:auto;padding:0.625rem 1.5rem" onclick="createKomisyon()">Oluştur</button>
+        </div>
+
+        <div class="card" style="margin-top:1rem">
+          <h2>Komisyon Listesi</h2>
+          <div id="komisyon-listesi">Yükleniyor…</div>
+        </div>
+
+        <!-- Komisyon detay modal -->
+        <div id="komisyon-modal" class="modal hidden">
+          <div class="modal-box" style="max-width:700px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+              <h2 id="komisyon-modal-baslik"></h2>
+              <button onclick="closeKomisyonModal()" class="btn-ghost">✕</button>
+            </div>
+
+            <!-- Üyeler -->
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:0.75rem">Üyeler</h3>
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+              <select id="komisyon-uye-select" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:0.5rem;font-size:0.9rem"></select>
+              <button class="btn-primary" style="width:auto;padding:0.5rem 1rem" onclick="addKomisyonUye()">Ekle</button>
+            </div>
+            <div id="komisyon-uye-listesi" style="margin-bottom:1.5rem"></div>
+
+            <!-- Kararlar -->
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:0.75rem">Kararlar</h3>
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+              <input type="text" id="karar-metni" placeholder="Karar metni girin…" style="flex:1">
+              <button class="btn-primary" style="width:auto;padding:0.5rem 1rem" onclick="addKarar()">Ekle</button>
+            </div>
+            <div id="komisyon-karar-listesi" style="margin-bottom:1.5rem"></div>
+
+            <button id="komisyon-end-btn" class="btn-danger" onclick="endKomisyon()">Komisyonu Sonlandır</button>
+          </div>
         </div>
       </section>
 
@@ -252,7 +297,15 @@
       <section id="page-salon" class="mod-page hidden">
         <h1 class="page-title">Salon</h1>
         <div class="card">
-          <p class="hint">🚧 Yapım aşamasında</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <div style="display:flex;gap:1rem;font-size:0.85rem">
+              <span><span style="display:inline-block;width:12px;height:12px;background:#16a34a;border-radius:3px;margin-right:4px"></span>Salonda</span>
+              <span><span style="display:inline-block;width:12px;height:12px;background:#e2e4e9;border-radius:3px;margin-right:4px"></span>Salonda Değil</span>
+              <span><span style="display:inline-block;width:12px;height:12px;background:#94a3b8;border-radius:3px;margin-right:4px"></span>Boş Koltuk</span>
+            </div>
+            <button class="btn-ghost" style="font-size:0.8rem" onclick="loadSalon()">↻ Yenile</button>
+          </div>
+          <div id="salon-container"></div>
         </div>
       </section>
 
@@ -322,8 +375,67 @@
       <!-- Kullanıcılar -->
       <section id="page-kullanicilar" class="mod-page hidden">
         <h1 class="page-title">Kullanıcılar</h1>
+
         <div class="card">
-          <p class="hint">🚧 Yapım aşamasında</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <input type="text" id="kullanici-ara" placeholder="İsim veya TC ara…" style="width:60%">
+            <button class="btn-primary" style="width:auto;padding:0.5rem 1rem" onclick="openUyeModal()">+ Yeni Üye</button>
+          </div>
+          <div id="kullanici-listesi">Yükleniyor…</div>
+        </div>
+
+        <!-- Üye ekle/düzenle modal -->
+        <div id="uye-modal" class="modal hidden">
+          <div class="modal-box" style="max-width:500px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem">
+              <h2 id="uye-modal-baslik">Yeni Üye</h2>
+              <button onclick="closeUyeModal()" class="btn-ghost">✕</button>
+            </div>
+            <div class="field">
+              <label>Ad</label>
+              <input type="text" id="uye-ad" placeholder="Ad">
+            </div>
+            <div class="field">
+              <label>Soyad</label>
+              <input type="text" id="uye-soyad" placeholder="Soyad">
+            </div>
+            <div class="field">
+              <label>TC Kimlik No</label>
+              <input type="text" id="uye-tc" placeholder="11 haneli TC no" maxlength="11">
+            </div>
+            <div class="field">
+              <label>Parti</label>
+              <input type="text" id="uye-parti" placeholder="Parti adı">
+            </div>
+            <div class="field">
+              <label>Sistem Rolü</label>
+              <select id="uye-rol">
+                <option value="member">Üye</option>
+                <option value="moderator">Moderatör</option>
+              </select>
+            </div>
+            <div class="field" id="uye-sifre-field">
+              <label>Şifre</label>
+              <input type="password" id="uye-sifre" placeholder="Şifre">
+            </div>
+            <button class="btn-primary" style="margin-top:0.5rem" onclick="saveUye()">Kaydet</button>
+          </div>
+        </div>
+
+        <!-- Şifre sıfırlama modal -->
+        <div id="sifre-modal" class="modal hidden">
+          <div class="modal-box" style="max-width:400px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+              <h2>Şifre Sıfırla</h2>
+              <button onclick="closeSifreModal()" class="btn-ghost">✕</button>
+            </div>
+            <p id="sifre-modal-uye" class="subtitle"></p>
+            <div class="field" style="margin-top:1rem">
+              <label>Yeni Şifre</label>
+              <input type="password" id="yeni-sifre" placeholder="Yeni şifre">
+            </div>
+            <button class="btn-primary" style="margin-top:0.5rem" onclick="resetSifre()">Sıfırla</button>
+          </div>
         </div>
       </section>
 
@@ -339,7 +451,28 @@
       <section id="page-denetim" class="mod-page hidden">
         <h1 class="page-title">Denetim</h1>
         <div class="card">
-          <p class="hint">🚧 Yapım aşamasında</p>
+          <div style="display:flex;gap:1rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+            <select id="audit-filtre" onchange="loadDenetim()">
+              <option value="">Tüm işlemler</option>
+              <option value="login">Giriş</option>
+              <option value="logout">Çıkış</option>
+              <option value="voting_start">Oylama Başlat</option>
+              <option value="voting_close">Oylama Kapat</option>
+              <option value="member_create">Üye Ekle</option>
+              <option value="member_update">Üye Düzenle</option>
+              <option value="member_delete">Üye Sil</option>
+              <option value="password_reset">Şifre Sıfırla</option>
+              <option value="meeting_start">Oturum Başlat</option>
+              <option value="meeting_end">Oturum Kapat</option>
+            </select>
+            <select id="audit-limit" onchange="loadDenetim()">
+              <option value="50">Son 50</option>
+              <option value="100" selected>Son 100</option>
+              <option value="250">Son 250</option>
+            </select>
+            <button class="btn-ghost" style="font-size:0.8rem" onclick="loadDenetim()">↻ Yenile</button>
+          </div>
+          <div id="denetim-listesi">Yükleniyor…</div>
         </div>
       </section>
 
